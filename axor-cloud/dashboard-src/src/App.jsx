@@ -24,7 +24,7 @@ function Overview() {
   useEffect(() => { j("/analytics/summary").then(setS); j("/analytics/daily").then(setD); j("/commands/history?limit=6").then(setH); }, []);
   if (!s) return null;
   return <><h1>Overview</h1><p className="sub">Everything Axor has synced from your Mac.</p>
-    <div className="cards">{[["Commands", s.total], ["Avg response", s.avg_ms + " ms"], ["Success rate", s.success + "%"], ["Voice / Text", s.voice + " / " + s.text]].map(x => <div className="card" key={x[0]}><b>{x[1]}</b><span>{x[0]}</span></div>)}</div>
+    <div className="cards">{[["Commands", s.total], ["Avg response", Math.round(s.avg_ms) + " ms"], ["Success rate", s.success + "%"], ["Voice / Text", s.voice + " / " + s.text]].map(x => <div className="card" key={x[0]}><b>{x[1]}</b><span>{x[0]}</span></div>)}</div>
     <div className="panel"><h3>Commands per day</h3>{d.length ? <ResponsiveContainer width="100%" height={200}><BarChart data={d}><CartesianGrid stroke="#8884" vertical={false} /><XAxis dataKey="day" tick={{ fontSize: 11 }} tickFormatter={x => x.slice(5)} /><YAxis allowDecimals={false} tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="n" fill="#10a37f" radius={[4, 4, 0, 0]} maxBarSize={56} /></BarChart></ResponsiveContainer> : <Empty t="No synced commands yet. Use Axor, then come back." />}</div>
     <div className="panel"><h3>Latest activity</h3>{h.length ? <table><tbody>{h.map(x => <tr key={x.id}><td><span className={"tag " + (x.source === "voice" ? "v" : "")}>{x.source}</span></td><td>{x.command}</td><td style={{ color: "var(--mut)" }}>{x.response}</td></tr>)}</tbody></table> : <Empty t="Nothing yet." />}</div></>;
 }
@@ -61,7 +61,17 @@ function Settings({ theme, setTheme }) {
     <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}><span>Voice</span><select value={s.voice || "Daniel"} onChange={e => put("voice", e.target.value)}><option>Daniel</option><option>Tara</option><option>Samantha</option></select></div>
     <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}><span>Speak replies to voice commands</span><select value={s.speak || "1"} onChange={e => put("speak", e.target.value)}><option value="1">On</option><option value="0">Off</option></select></div></div></>;
 }
-const PAGES = [["overview", "📊", "Overview"], ["history", "🕘", "History"], ["analytics", "📈", "Analytics"], ["calendar", "📅", "Calendar"], ["reminders", "⏰", "Reminders"], ["notes", "📝", "Notes"], ["settings", "⚙️", "Settings"]];
+const IC = {
+  overview: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
+  history: "M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm-1 5v5l4 2 .8-1.5-3.3-1.6V8H12z",
+  analytics: "M4 20h16v2H2V2h2v18zm4-4V9h3v7H8zm5 0V5h3v11h-3zm5 0v-5h3v5h-3z",
+  calendar: "M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 8h14v10H5V10z",
+  reminders: "M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 0 0-5-5.9V4a1 1 0 0 0-2 0v1.1A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2z",
+  notes: "M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6zm7 1.5L18.5 9H13V3.5zM8 13h8v2H8v-2zm0 4h8v2H8v-2z",
+  settings: "M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 3a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 3h4l.4-3c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4-2.2-1.6zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z",
+};
+const Icon = ({ k }) => <svg className="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={IC[k]} /></svg>;
+const PAGES = [["overview", "Overview"], ["history", "History"], ["analytics", "Analytics"], ["calendar", "Calendar"], ["reminders", "Reminders"], ["notes", "Notes"], ["settings", "Settings"]];
 export default function App() {
   const [user, setUser] = useState(null), [page, setPage] = useState("overview"), [theme, setTheme] = useState(() => { try { return localStorage.getItem("axor_theme") || "dark"; } catch { return "dark"; } });
   useEffect(() => { document.documentElement.dataset.theme = theme; try { localStorage.setItem("axor_theme", theme); } catch {} }, [theme]);
@@ -70,9 +80,9 @@ export default function App() {
   const out = () => { try { localStorage.removeItem("axor_cloud_t"); } catch {} setUser(null); };
   const P = { overview: <Overview />, history: <History />, analytics: <Analytics />, settings: <Settings theme={theme} setTheme={setTheme} />,
     calendar: <Simple key="events" name="events" title="Calendar" sub="Meetings Axor scheduled." cols={["When", "Title"]} fields={[{ k: "title", p: "Meeting title" }, { k: "start", type: "datetime-local" }]} render={x => <><td>{x.start.replace("T", " ")}</td><td>{x.title}</td></>} />,
-    reminders: <Simple key="reminders" name="reminders" title="Reminders" sub="Reminders, alarms and timers." cols={["When", "What", "Status"]} fields={[{ k: "text", p: "Reminder text" }, { k: "due", type: "datetime-local" }]} render={x => <><td>{x.due.replace("T", " ")}</td><td>{x.text}</td><td>{x.fired ? "✅ done" : "⏳ pending"}</td></>} />,
+    reminders: <Simple key="reminders" name="reminders" title="Reminders" sub="Reminders, alarms and timers." cols={["When", "What", "Status"]} fields={[{ k: "text", p: "Reminder text" }, { k: "due", type: "datetime-local" }]} render={x => <><td>{x.due.replace("T", " ")}</td><td>{x.text}</td><td><span className={"chip " + (x.fired ? "ok" : "wait")}>{x.fired ? "Done" : "Pending"}</span></td></>} />,
     notes: <Simple key="notes" name="notes" title="Notes" sub="Notes taken by voice or text." cols={["Saved", "Note"]} fields={[{ k: "text", p: "Write a note" }]} render={x => <><td style={{ color: "var(--mut)", whiteSpace: "nowrap" }}>{x.ts.replace("T", " ")}</td><td>{x.text}</td></>} /> };
   return <div className="app"><aside className="side"><div className="logo"><img src="logo.svg" alt="" />Axor Cloud</div>
-    {PAGES.map(([k, e, n]) => <button key={k} className={"nav " + (page === k ? "on" : "")} onClick={() => setPage(k)}>{e}&nbsp; {n}</button>)}
-    <div className="foot">👤 {user} · <span className="link" onClick={out}>Sign out</span></div></aside><main className="main">{P[page]}</main></div>;
+    {PAGES.map(([k, n]) => <button key={k} className={"nav " + (page === k ? "on" : "")} onClick={() => setPage(k)}><Icon k={k} />{n}</button>)}
+    <div className="foot"><span className="av">{user[0].toUpperCase()}</span><span className="un">{user}</span><span className="link" onClick={out}>Sign out</span></div></aside><main className="main">{P[page]}</main></div>;
 }
