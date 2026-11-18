@@ -1,0 +1,7 @@
+flask
+faster-whisper
+python-dotenv
+redis
+selenium
+sympy
+pypdf

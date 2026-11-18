@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Axor - your offline voice assistant</title><link rel="icon" href="static/logo.svg" type="image/svg+xml">
+<style>:root{--bg:#0a0b10;--fg:#eef0f6;--mut:#9aa1b5;--a:#7c5cff;--b:#22d3ee;--card:#141622;--line:#23263a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 Inter,system-ui,sans-serif}
+.bg{position:fixed;inset:0;background:radial-gradient(600px 400px at 20% 10%,#7c5cff33,transparent),radial-gradient(500px 400px at 85% 30%,#22d3ee22,transparent);z-index:-1}
+nav,section,footer{max-width:1040px;margin:auto;padding:24px}nav{display:flex;justify-content:space-between;align-items:center}
+.logo{font-weight:800;font-size:22px;letter-spacing:.5px;display:flex;align-items:center;gap:10px}.logo img{border-radius:9px}a{color:inherit}
+.btn{display:inline-block;padding:12px 22px;border-radius:12px;background:linear-gradient(135deg,var(--a),var(--b));color:#fff;text-decoration:none;font-weight:600}
+.btn.g{background:none;border:1px solid var(--line)}
+.hero{text-align:center;padding:90px 24px 60px}.hero h1{font-size:clamp(36px,6vw,64px);line-height:1.1;margin:0 0 18px}
+.hero h1 span{background:linear-gradient(135deg,var(--a),var(--b));-webkit-background-clip:text;color:transparent}
+.hero p{color:var(--mut);max-width:620px;margin:0 auto 28px;font-size:18px}
+.orbimg{display:block;margin:0 auto 30px;border-radius:30px;box-shadow:0 0 80px #19c39a66;animation:p 3s ease-in-out infinite}
+@keyframes p{50%{transform:scale(1.08);box-shadow:0 0 120px #22d3ee88}}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}.card h3{margin:0 0 6px}.card p{margin:0;color:var(--mut)}
+h2{font-size:32px;margin:50px 0 20px}.try code{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:8px 0;color:var(--b)}
+footer{color:var(--mut);text-align:center;border-top:1px solid var(--line);margin-top:50px;font-size:14px}</style></head><body><div class="bg"></div>
+<nav><div class="logo"><img src="static/logo.svg" alt="" width="30" height="30">Axor</div><div><a href="#features">Features</a> &nbsp; <a href="#try">Try</a> &nbsp; <a href="#team">Team</a></div></nav>
+<div class="hero"><img class="orbimg" src="static/logo.svg" alt="Axor" width="120" height="120"><h1>Talk to your computer.<br><span>Even without internet.</span></h1><p>Axor is a local AI voice assistant. It opens apps, sets reminders, schedules meetings and sends messages, in English and Hindi, and syncs to the cloud when you are back online.</p><a class="btn" href="#try">See what it does</a> <a class="btn g" href="#features">Features</a></div>
+<section id="features"><h2>What it does</h2><div class="grid">
+<div class="card"><h3>Offline first</h3><p>Speech recognition (Whisper) and the command engine run on your machine.</p></div>
+<div class="card"><h3>Voice and text</h3><p>Type for a text reply, speak for a spoken one.</p></div>
+<div class="card"><h3>Hindi + English</h3><p>Understands Hinglish commands like "youtube kholo".</p></div>
+<div class="card"><h3>Smart sync</h3><p>Queues your data offline and syncs when connected.</p></div>
+<div class="card"><h3>Dashboard</h3><p>History, analytics, calendar, reminders and notes on the web.</p></div>
+<div class="card"><h3>Connects to your tools</h3><p>Gmail, Google Calendar, Firebase, Supabase, Cloudinary (optional, with your keys).</p></div></div></section>
+<section id="try" class="try"><h2>Try saying</h2><code>open youtube</code><code>set a reminder in 10 minutes to drink water</code><code>schedule a meeting with Rahul tomorrow at 5 pm</code><code>what is 18 percent of 2400</code><code>read my emails</code></section>
+<section id="team"><h2>Team</h2><div class="grid"><div class="card"><h3>Jayanth</h3><p>23BCB7169</p></div><div class="card"><h3>Nazeer</h3><p>23BCB7230</p></div><div class="card"><h3>Charan</h3><p>23BCB7120</p></div><div class="card"><h3>Sampath</h3><p>23BCB7136</p></div></div></section>
+<footer>Axor · Capstone Project · B.Tech CSE (Business Systems), VIT-AP University</footer></body></html>

@@ -1,0 +1,14 @@
+# secrets and personal data: never commit
+.env
+credentials.json
+google_token.json
+*token*.json
+*.db
+*.sqlite
+uploads/
+meetings/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+node_modules/
