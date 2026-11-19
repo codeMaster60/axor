@@ -272,6 +272,19 @@ body.enter #bar{animation:rise .7s var(--ease) .95s both}
 #cp .hue{position:relative;flex:1;height:12px;border-radius:8px;cursor:pointer;touch-action:none;background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}#cp .hue .knob{top:50%}
 #cp .inps{display:grid;grid-template-columns:1.7fr 1fr 1fr 1fr;gap:6px}#cp label{font-size:11px;color:var(--mut);display:flex;flex-direction:column;gap:3px}#cp input{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px 7px;font:13px ui-monospace,Menlo,monospace;outline:none}#cp input:focus{border-color:var(--ac)}
 #cp .cpn{font-size:12px;color:var(--warn);min-height:16px;margin-top:8px}#cp .cpb{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}#cp .cpb button{padding:6px 14px;border-radius:10px;border:1px solid var(--line);font-size:13px}#cp .cpb .go{background:var(--ac);color:var(--onac);border-color:var(--ac);font-weight:600}
+</style><style id="acts2">
+.acts{gap:2px;margin-top:6px;margin-left:-8px;opacity:.75}
+.acts button{border:0;padding:0;width:32px;height:32px;display:grid;place-items:center;border-radius:8px;background:none;color:var(--mut)}
+.acts button svg,.uacts svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.acts button:hover{background:var(--s2);color:var(--tx)}
+.acts button.on{color:var(--ac)}
+.acts button[data-a=speak].on{background:rgba(var(--acrgb),.14)}
+.acts button[data-a=all],.acts button[data-a=lnk]{width:auto;padding:0 12px}
+.m.u .col{align-items:flex-end}
+.uacts{display:flex;gap:2px;margin-right:-6px;opacity:.75}
+.m.u .uacts .ed,.m.u .uacts .uc{position:static;left:auto;top:auto;opacity:1;width:32px;height:32px;padding:0;display:grid;place-items:center;border:0;border-radius:8px;background:none;color:var(--mut)}
+.m.u .uacts .ed:hover,.m.u .uacts .uc:hover{background:var(--s2);color:var(--tx);border:0}
+.col:has(.edbox) .uacts{display:none}
 </style><link rel="stylesheet" href="/static/vendor/katex/katex.min.css"><script defer src="/static/vendor/katex/katex.min.js"></script><script defer src="/static/vendor/html2canvas.min.js"></script></head><body class="hold">
 <div class="aurora"><i></i><i></i></div>
 
@@ -360,7 +373,7 @@ body.enter #bar{animation:rise .7s var(--ease) .95s both}
     <div class="set"><div>Product tour<small>A 30-second walk through Axor</small></div><button class="btn g" id="tourbtn">Replay tour</button></div>
     <div class="set"><div>Cite web sources<small>Factual questions get sources listed. Needs internet</small></div><button class="sw" id="s-cite"></button></div>
     <div class="set"><div>Voice</div><select id="s-voice"><option>Ava (Premium)</option><option>Moira</option><option>Daniel</option><option>Tara</option><option>Samantha</option><option>Alex</option></select></div>
-    <div class="set"><div>Browser</div><select id="s-browser"><option>Arc</option><option>Safari</option><option>Google Chrome</option></select></div>
+    <div class="set"><div>Browser</div><select id="s-browser"><option>Default browser</option><option>Arc</option><option>Safari</option><option>Google Chrome</option></select></div>
     <div class="set"><div>Speech language<small>Auto handles Hindi + English</small></div><select id="s-lang"><option value="en">English</option><option value="hi">Hindi</option><option value="auto">Auto</option></select></div>
     <div class="set"><div>Web dashboard<small>Synced copy of your data</small></div><a class="btn g" href="http://localhost:8080" target="_blank" style="text-decoration:none">Open ↗</a></div>
     <div class="set"><div>Export history<small>Every command and answer as a CSV file</small></div><button class="btn g" id="exp">Export CSV</button></div>
@@ -405,7 +418,7 @@ const ext=n=>(n.split(".").pop()||"").slice(0,4).toUpperCase();
 const size=b=>b<1024?b+" B":b<1048576?(b/1024).toFixed(0)+" KB":(b/1048576).toFixed(1)+" MB";
 function chipHTML(name,file){const th=file&&file.type.startsWith("image/")?`<img src="${URL.createObjectURL(file)}" alt="">`:`<div class="fi">${esc(ext(name))}</div>`;return `<div class="chip">${th}<div><b>${esc(name)}</b>${file?`<small>${size(file.size)}</small>`:""}</div></div>`}
 function addUser(t,src,file,attName){hideHero();const d=document.createElement("div");d.className="m u";
-  d.innerHTML=`<div class="col">${file?chipHTML(file.name,file):attName?chipHTML(attName,null):""}${t?`<div class="t">${esc(t)}</div>`:""}${t&&!file&&!attName?`<button class="ed" title="Edit this message">Edit</button>`:""}</div>`;$("#msgs").appendChild(d);scroll(true)}
+  d.innerHTML=`<div class="col">${file?chipHTML(file.name,file):attName?chipHTML(attName,null):""}${t?`<div class="t">${esc(t)}</div>`:""}${t&&!file&&!attName?`<div class="uacts"><button class="uc" title="Copy" aria-label="Copy">${AICO.copy}</button><button class="ed" title="Edit this message" aria-label="Edit">${AICO.edit}</button></div>`:""}</div>`;$("#msgs").appendChild(d);scroll(true)}
 const LOOK=/^(who|when|where|what('?s| is| was| are) the|latest|news|tell me about|history of|define|how (many|much|old|tall|far))\b|\b(sources?|latest news|net worth|prime minister|population of|capital of)\b/i,IMG=/\b(image|photo|picture|pic|draw|paint|illustration|logo|wallpaper|poster)s?\b/i;
 function addThink(q){q=q||"";const lab=/\b(assignment|essay|term paper|lab report|project report|cover letter|resume|abstract|article|proposal|case study|report|letter)\b/i.test(q)&&/\b(write|draft|prepare|create|generate|make|give|do|need|compose)\b/i.test(q)&&!IMG.test(q)?"Writing your document":/^(generate|create|draw|make|design|paint|imagine)\b/i.test(q)&&IMG.test(q)?"Painting your image":IMG.test(q)&&/\b(show|give|find|get|send)\b/i.test(q)?"Finding pictures":LOOK.test(q)?"Searching the web":"";
   const d=document.createElement("div");d.className="m a";d.innerHTML=`<div class="body"><div class="think"><i></i><i></i><i></i>${lab?`<span class="tl">${lab}</span>`:""}</div></div>`;$("#msgs").appendChild(d);scroll(true);return d}
@@ -509,6 +522,7 @@ $("#msgs").addEventListener("click",e=>{const b=e.target.closest(".ed");if(!b)re
     try{if(CONV)await jpost("/api/chats/"+encodeURIComponent(CONV)+"/truncate",{from:idx})}catch(er){toast("Couldn't edit that message");close();return}
     let n=m;while(n){const x=n.nextElementSibling;n.remove();n=x}send(v,"text");setTimeout(loadRecent,400)};
   box.querySelector(".go").onclick=go;ta.onkeydown=ev=>{if(ev.key==="Enter"&&!ev.shiftKey){ev.preventDefault();go()}if(ev.key==="Escape")close()}});
+document.addEventListener("click",e=>{const b=e.target.closest(".uc");if(!b)return;const t=b.closest(".m.u")?.querySelector(".t")?.textContent||"";navigator.clipboard?.writeText(t).then(()=>toast("Copied"))});
 /* document card */
 function docCard(th,r){const text0=r.response,body=th.querySelector(".body");let cur=text0,editing=false;const tm=cur.match(/^\s*#\s+(.+)$/m),title=(tm?tm[1]:"Document").slice(0,80);
   body.innerHTML=`<div class="doc"><div class="dh"><div class="dt"><b>${esc(title)}</b><small>Document \u00b7 you can edit it</small></div><div class="da"><button data-d="edit">Edit</button><button data-d="copy">Copy</button><button class="pri" data-d="dl">Download .docx</button></div></div><div class="dp md"></div></div><div class="meta">${r.ms} ms</div>`;
@@ -518,15 +532,26 @@ function docCard(th,r){const text0=r.response,body=th.querySelector(".body");let
     else if(k==="copy")navigator.clipboard?.writeText(cur).then(()=>toast("Copied"));
     else if(k==="dl"){try{const x=await ff("/api/docx",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:cur})});if(!x.ok)throw 0;await saveBlob(await x.blob(),(((cur.match(/^\s*#\s+(.+)$/m)||[0,title])[1]).replace(/[^\w\- ]+/g,"").trim().slice(0,40).replace(/ +/g,"-")||"axor-document")+".docx","Word document",".docx")}catch(er){toast("Couldn't build the file")}}};
   scroll(true)}
+const AICO={
+up:'<svg viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1 2.2 2.5L12.7 9H19a2 2 0 011.9 2.6l-2 6.5A2 2 0 0117 19.5H7"/></svg>',
+down:'<svg viewBox="0 0 24 24"><path d="M7 13V4H4v9zM7 13l4 7c1.5 0 2.5-1 2.2-2.5L12.7 15H19a2 2 0 001.9-2.6l-2-6.5A2 2 0 0017 4.5H7"/></svg>',
+copy:'<svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg>',
+speak:'<svg viewBox="0 0 24 24"><path d="M4 9.5v5h4l5 4v-13l-5 4zM16.5 9a4 4 0 010 6M19 6.5a8 8 0 010 11"/></svg>',
+redo:'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-2.6 5.9M20 5v5h-5"/></svg>',
+edit:'<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16zM13.5 6.5l4 4"/></svg>'};
+const AB=(k,t)=>`<button data-a="${k}" title="${t}" aria-label="${t}">${AICO[k]}</button>`;
 function actions(body,text){const a=document.createElement("div");a.className="acts";const figs=[...body.querySelectorAll("figure:not(.bad)")];
   if(figs.length){a.innerHTML=`<button data-a="all">${figs.length>1?"Save all "+figs.length+" images":"Save image"}</button><button data-a="lnk">Copy links</button>`}
-  else a.innerHTML=`<button data-a="copy">Copy</button><button data-a="speak" title="Play this reply as sound">Play sound</button>`;
-  a.onclick=async e=>{const k=e.target.dataset.a;if(!k)return;const dd=a.querySelector(".dd");
-    if(k==="speak"){const b=e.target;if(b.dataset.on==="1"){b.dataset.on="";b.textContent="Play sound";try{speechSynthesis.cancel()}catch(_){}ff("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stop:true})}).catch(()=>{});return}
-      b.dataset.on="1";b.textContent="Stop sound";let ok=false;try{const r=await ff("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});ok=(await r.json()).ok}catch(_){}
-      if(!ok&&window.speechSynthesis){const u=new SpeechSynthesisUtterance(text.replace(/[*#`_>|]/g,""));u.onend=()=>{b.dataset.on="";b.textContent="Play sound"};speechSynthesis.cancel();speechSynthesis.speak(u)}
-      else if(!ok){b.dataset.on="";b.textContent="Play sound";toast("Sound isn't available here")}
-      else setTimeout(()=>{b.dataset.on="";b.textContent="Play sound"},Math.min(60000,Math.max(3000,text.length*70)));return}
+  else a.innerHTML=AB("up","Good reply")+AB("down","Bad reply")+AB("copy","Copy")+AB("speak","Play sound")+AB("redo","Try again");
+  a.onclick=async e=>{const bt=e.target.closest("button"),k=bt&&bt.dataset.a;if(!k)return;const dd=a.querySelector(".dd");
+    if(k==="speak"){const b=bt,off=()=>{b.classList.remove("on");b.title="Play sound"};
+      if(b.classList.contains("on")){off();try{speechSynthesis.cancel()}catch(_){}ff("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stop:true})}).catch(()=>{});return}
+      b.classList.add("on");b.title="Stop sound";let ok=false;try{const r=await ff("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});ok=(await r.json()).ok}catch(_){}
+      if(!ok&&window.speechSynthesis){const u=new SpeechSynthesisUtterance(text.replace(/[*#`_>|]/g,""));u.onend=off;speechSynthesis.cancel();speechSynthesis.speak(u)}
+      else if(!ok){off();toast("Sound isn't available here")}
+      else setTimeout(off,Math.min(60000,Math.max(3000,text.length*70)));return}
+    if(k==="up"||k==="down"){const on=!bt.classList.contains("on");a.querySelectorAll('[data-a="up"],[data-a="down"]').forEach(x=>x.classList.remove("on"));if(on)bt.classList.add("on");try{localStorage.setItem("axor_fb",JSON.stringify({...JSON.parse(localStorage.getItem("axor_fb")||"{}"),[text.slice(0,60)]:on?k:null}))}catch(_){}toast(on?(k==="up"?"Glad that helped":"Thanks, noted"):"Feedback removed");return}
+    if(k==="redo"){const q=a.closest(".m")?.previousElementSibling?.querySelector(".t")?.textContent;if(q)send(q,"text");return}
     if(k==="menu"){dd.classList.toggle("open");return}dd&&dd.classList.remove("open");
     if(k==="copy")navigator.clipboard?.writeText(text).then(()=>toast("Copied"));
     else if(k==="txt")saveBlob(new Blob([text],{type:"text/markdown"}),fname(".md"),"Markdown",".md");
@@ -539,7 +564,7 @@ function showReply(th,r,static_){const how=r.source==="voice"?"voice + text":"te
   th.querySelector(".body").innerHTML=`${NOBADGE.has(r.category)?"":`<span class="badge k ${r.ok?"":"bad"}">${esc(lab(r.category))}</span>`}<div class="t ${r.ok?"":"bad"}"></div><div class="meta">${how} · ${r.ms} ms</div>`;
   const t=th.querySelector(".t"),body=th.querySelector(".body");
   if(static_||r.response.includes("![")){t.classList.add("md");t.innerHTML=md(r.response);actions(body,r.response);scroll(true)}else reveal(t,r.response,()=>actions(body,r.response))}
-async function send(text,source){text=text.trim();const f=PEND;if(!text&&!f)return;addUser(text,source,f);PEND=null;renderPend();const th=addThink(text);
+async function send(text,source){text=text.trim();const f=PEND;if(!text&&!f)return;try{speechSynthesis.cancel()}catch(_){}ff("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stop:true})}).catch(()=>{});addUser(text,source,f);PEND=null;renderPend();const th=addThink(text);
   try{let r;
     if(f){const fd=new FormData();fd.append("file",f);fd.append("text",text);if(CONV)fd.append("conv",CONV);const x=await ff("/api/attach",{method:"POST",body:fd});r=await x.json();if(!x.ok)throw new Error(r.error||"Upload failed")}
     else r=await jpost("/api/command",{text,source,conv:CONV,web:WEB});
@@ -597,7 +622,7 @@ async function onStop(){cancelAnimationFrame(raf);$("#mic").classList.remove("re
   const fd=new FormData();fd.append("audio",blob,"a.webm");
   try{const r=await(await ff("/api/transcribe",{method:"POST",body:fd})).json();th.remove();
     if(r.error||!r.text){toast(r.error?"Transcription failed: "+r.error:"I couldn't hear any speech. Try again.");return}send(r.text,"voice")}catch(e){th.remove();toast("Transcription failed.")}}
-const toggleMic=()=>rec&&rec.state==="recording"?rec.stop():startRec();
+const stopTalk=()=>{try{speechSynthesis.cancel()}catch(_){}ff("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stop:true})}).catch(()=>{})};const toggleMic=()=>{if(rec&&rec.state==="recording")rec.stop();else{stopTalk();startRec()}};
 $("#mic").onclick=toggleMic;$("#orb").onclick=toggleMic;
 addEventListener("keydown",e=>{if(e.code==="Space"&&e.ctrlKey){e.preventDefault();toggleMic()}});
 

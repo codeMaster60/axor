@@ -108,13 +108,16 @@ APPS = {"whatsapp":"WhatsApp","safari":"Safari","chrome":"Google Chrome","arc":"
  "system settings":"System Settings","photos":"Photos","telegram":"Telegram","facetime":"FaceTime","reminders":"Reminders",
  "clock":"Clock","maps":"Maps","preview":"Preview","zoom":"zoom.us","slack":"Slack","word":"Microsoft Word","excel":"Microsoft Excel",
  "powerpoint":"Microsoft PowerPoint","discord":"Discord","teams":"Microsoft Teams","brave":"Brave Browser","firefox":"Firefox"}
-SITES = {"youtube":"https://www.youtube.com","gmail":"https://mail.google.com","google":"https://www.google.com",
+SITES = {"youtube":"https://www.youtube.com","yt":"https://www.youtube.com","gmail":"https://mail.google.com","google":"https://www.google.com",
  "github":"https://github.com","linkedin":"https://www.linkedin.com","instagram":"https://www.instagram.com",
  "twitter":"https://x.com","x":"https://x.com","facebook":"https://www.facebook.com","netflix":"https://www.netflix.com",
  "chatgpt":"https://chatgpt.com","claude":"https://claude.ai","drive":"https://drive.google.com","maps":"https://maps.google.com",
  "vtop":"https://vtop.vitap.ac.in","vit":"https://vitap.ac.in","canva":"https://www.canva.com","amazon":"https://www.amazon.in"}
 def open_url(url):
     b = get_settings()["browser"]
+    if b in ("", "Default browser"):
+        ok, _ = sh(["open", url]) if IS_MAC else (False, "")
+        return ok
     ok, _ = sh(["open", "-a", b, url]) if IS_MAC else (False, "")
     if not ok: sh(["open", url])
     return ok
@@ -129,18 +132,30 @@ DEL_OTHER = re.compile(r"\b(?:chat|chats|notes?|files?|messages?|history|account
 FOLLOWCAL = re.compile(r"\b(?:add|put|save|sync)\s+(?:it|this|that|the (?:reminder|task|event))\b|\b(?:add|put|save)\s+(?:it\s+)?(?:in|to|on|into)\s+(?:my\s+)?(?:go+gle\s+)?cal[a-z]{3,8}\b|\bin (?:my )?(?:go+gle )?cal[a-z]{3,8}\b")
 def parse_when(t):
     now = datetime.now(); m = _REL.search(t)
+    _MON=["january","february","march","april","may","june","july","august","september","october","november","december"]
+    _dm=re.search(r"\b(?:on\s+)?(?:(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)[a-z]*,?\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b(?:\s+(\d{4}))?",t) or re.search(r"\b(?:on\s+)?(?:(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)[a-z]*,?\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s+(\d{4}))?",t)
+    _date=None
+    if _dm:
+        g=_dm.groups()
+        try:
+            d_,mo_=(int(g[0]),g[1]) if g[0].isdigit() else (int(g[1]),g[0])
+            _date=now.replace(month=[x[:3] for x in _MON].index(mo_[:3])+1,day=d_,year=int(g[2]) if g[2] else now.year,hour=0,minute=0,second=0,microsecond=0)
+            t=t.replace(_dm.group(0)," ")
+        except Exception: _date=None
+    t=re.sub(r"\btoday\b"," ",t)
     if m:
         w, u = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
         n = 1 if w in ("a", "an") else 0.5 if w.startswith("half") else NUMW.get(w) or float(w)
         d = timedelta(seconds=n) if u.startswith("sec") else timedelta(minutes=n) if u.startswith("min") else timedelta(hours=n)
         return now + d, t.replace(m.group(0), "").strip()
-    m = re.search(r"\b(?:at )?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)", t) or re.search(r"\bat (\d{1,2})(?::(\d{2}))?()\b", t)
+    m = re.search(r"\b(?:at )?(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)", t) or re.search(r"\bat (\d{1,2})(?::(\d{2}))?()\b", t)
     if m:
         h = int(m.group(1)); mi = int(m.group(2) or 0); ap = (m.group(3) or "").replace(".", "")
         if ap == "pm" and h < 12: h += 12
         if ap == "am" and h == 12: h = 0
         dt = now.replace(hour=h % 24, minute=mi, second=0, microsecond=0)
-        if "tomorrow" in t: dt += timedelta(days=1)
+        if _date: dt=dt.replace(year=_date.year,month=_date.month,day=_date.day)
+        elif "tomorrow" in t: dt += timedelta(days=1)
         elif dt <= now: dt += timedelta(days=1)
         return dt, t.replace(m.group(0), "").replace("tomorrow", "").strip()
     if "tomorrow" in t:
@@ -272,9 +287,12 @@ def delete_item(t):
     if not (ig.google_connected() and online()): return "calendar", f"Deleted '{title}' ({when}) from Axor. I'm not connected to Google, so I couldn't touch Google Calendar.", True
     if gone: return "calendar", f"Deleted '{title}' ({when}) from Axor and from Google Calendar. Refresh the calendar to see it disappear.", True
     return "calendar", f"Deleted '{title}' ({when}) from Axor. I couldn't find a matching event that Axor created in Google Calendar, so if one is still there, delete it by hand (open it, then Delete).", True
-def run_command(raw):
+def _run_command_raw(raw):
     t = raw.lower().strip().rstrip(".!?")
     t = re.sub(r"^(hey |hi |ok |okay )?axor[, ]*", "", t).replace("please", "").strip()
+    t = re.sub(r"^(?:(?:can|could|coudld|coudl|would|will) (?:you|u|ya)(?: please)?|i (?:want|need) you to|i'?d like you to|go ahead and|just)\s+", "", re.sub(r"\s+", " ", t)).strip()
+    t = re.sub(r"\s+for me$", "", t)
+    t = re.sub(r"^(?:add|create|set|make)\s+(?:a\s+|an\s+)?(?:task|to-?do)\s+(?:to\s+|for\s+)?(?=\S)", "remind me to ", t)
     t = hindi_norm(t)
     s = get_settings()
     if not t and re.search(r"\baxor\b", raw.lower()): return "chat", f"Yes {OWNER}? I'm listening.", True
@@ -350,7 +368,7 @@ def run_command(raw):
             if n == 1: return "google", f"You have {len(ev)} thing{'s' if len(ev) != 1 else ''} {lab}: " + "; ".join(f"{w}, {x}" for _, w, x in ev) + ".", True
             return "google", f"Your calendar {lab}:\n\n" + "\n".join(f"- **{dd:%a %d %b}**, {w}: {x}" for dd, w, x in ev), True
         except Exception as e: return "google", f"I couldn't reach Google Calendar: {e}", False
-    if re.search(r"(read|check|any|new|unread|show|summari[sz]e).{0,25}\b(e-?mails?|mail|inbox|gmail)\b", t) and not re.search(r"open (gmail|mail)", t):
+    if re.search(r"(read|check|any|new|unread|show|summari[sz]e).{0,25}\b(e-?mails?|mails?|inbox|gmail)\b", t) and not re.search(r"open (gmail|mail)", t):
         if not ig.google_connected(): return "google", "I'm not connected to Gmail yet. Say 'connect Google' first.", False
         try: return "google", ig.gmail_summary(5, lambda q: llm(q)[0] if online() else None), True
         except Exception as e: return "google", f"I couldn't reach Gmail: {e}", False
@@ -371,6 +389,7 @@ def run_command(raw):
         with db() as c: rows = c.execute("SELECT text FROM notes WHERE user_id=? ORDER BY id DESC LIMIT 5", (uid(),)).fetchall()
         return "notes", ("Your latest notes: " + "; ".join(r["text"] for r in rows)) if rows else "You have no notes yet.", True
     # reminders / alarm / timer
+    t = re.sub(r"\b(set|make|create|start|add)\s+(?:me\s+)?(?:a|an|and|the|that)\s+(?=alarm|timer|reminder)", r"\1 an ", t); t = re.sub(r"\b(alarm|timer|reminder)s\b", r"\1", t); t = re.sub(r"^wake me (?:up )?(?:at |by |around )?", "set an alarm for ", t)
     _t0 = t; t = CALCLAUSE.sub(" ", t).strip(" ,.")
     m = re.match(r"(?:(?:set|start) (?:a |an )?)?(reminder|alarm|timer)(?: for| to| me)?\s*(.*)", t) or re.match(r"remind me (?:to |about )?(.*)", t)
     if m:
@@ -491,7 +510,7 @@ def run_command(raw):
     m = re.match(r"(?:open|launch|start|go to)\s+(.+)", t)
     if m:
         x = m.group(1).strip().replace(" website", "").replace(" app", "")
-        if x in SITES and x not in ("maps",): open_url(SITES[x]); return "web", f"Opening {x.title()} in {s['browser']}.", True
+        if x in SITES and x not in ("maps",): open_url(SITES[x]); return "web", f"Opening {x.title()}" + ("" if s['browser'] in ("", "Default browser") else f" in {s['browser']}") + ".", True
         if re.match(r"[\w\-]+\.[a-z]{2,}", x): open_url("https://" + x); return "web", f"Opening {x}.", True
         a = APPS.get(x, x.title()); ok, _ = sh(["open", "-a", a]); return "apps", (f"Opening {a}." if ok else f"I couldn't find an app called {x}."), ok
     # documents: assignments, essays, reports, letters -> a full editable document
@@ -504,6 +523,8 @@ def run_command(raw):
         # offline math (SymPy)
     mr = mathsolve.solve_text(raw)
     if mr: CUR.say = mr["say"]; return "math", mr["md"], True
+    if re.search(r"\bremind me\b|\b(?:set|make|create|start|wake)\b.*\b(?:alarm|timer|reminder)", raw, re.I):
+        return "reminder", "I couldn't work out the time for that, so nothing was set. Try: set an alarm for 7:49 pm.", False
     # LLM fallback (web-grounded with citations when the question is factual)
     if s.get("cite", "1") == "1" and getattr(CUR, "source", "text") != "voice" and online() and (getattr(CUR, "web", False) or wt.wants_sources(search_query(raw))):
         sq = search_query(raw)
@@ -514,7 +535,37 @@ def run_command(raw):
                              + conv_context() + [{"role": "user", "content": "Question: " + sq + "\n\nSources:\n" + wt.sources_block(src)}])
             if ans: return "ai", wt.finish_with_sources(ans, src), True
     ans, err = llm(raw)
+    if ans and re.search(r"\b(?:i['\u2019]?ve|i have|i['\u2019]?ll|i will)\s+(?:just\s+)?(?:set|added|scheduled|opened|locked|sent|created|put)\b", ans, re.I):
+        ans = "I haven't done that. Try a clear command, like: set an alarm for 8:15 pm, or remind me to call mom in 10 minutes."
     return ("ai", ans, True) if ans else ("offline", err or "I don't know that one.", False)
+
+
+_FIXPROMPT = ("The text is a speech-to-text transcript or a typed message sent to a Mac assistant. It may contain mishearings or typos "
+ "(for example 'set and alarm' means 'set an alarm', 'open your door' or 'open you deal' means 'open YouTube'). "
+ "Read it carefully several times and work out what the person most likely meant. If it is a command the assistant can run "
+ "(set an alarm, timer or reminder; remind me to do something; open an app or website; lock the screen; battery; read my mail; "
+ "calendar; notes; tasks; volume; screenshot), reply with ONLY the corrected command in plain English, for example: set an alarm for 8:15 pm. "
+ "If it is an ordinary question or chat, reply with exactly NONE.")
+def run_command(raw):
+    res = _run_command_raw(raw)
+    try:
+        cat, msg, ok = res
+        looks = bool(re.search(r"\b(alarm|timer|remind|reminder|open|launch|lock|calendar|mail|inbox|task|volume|screenshot|battery|note)\w*", raw, re.I))
+        failed = (not ok) or cat in ("ai", "offline", "apps")
+        if failed and (looks or getattr(CUR, "source", "text") == "voice") and online() and not getattr(CUR, "_fixing", False):
+            CUR._fixing = True
+            try:
+                fixed, _ = _chat([{"role": "system", "content": _FIXPROMPT}, {"role": "user", "content": raw}])
+            finally:
+                CUR._fixing = False
+            fixed = (fixed or "").strip().strip('"').strip()
+            if fixed and fixed.upper() != "NONE" and len(fixed) < 120 and fixed.lower().rstrip(".") != raw.lower().strip().rstrip("."):
+                CUR._fixing = True
+                try: res2 = _run_command_raw(fixed)
+                finally: CUR._fixing = False
+                if res2 and res2[2] and res2[0] not in ("ai", "offline"): return res2
+    except Exception as e: print("fixup:", e)
+    return res
 
 def speakable(t):
     t = re.sub(r"\$\$.*?\$\$|\$[^$]*\$", " the formula ", t, flags=re.S); t = re.sub(r"[*#`_>|\\]", "", t)
@@ -629,10 +680,17 @@ def sync_user(user_id, token):
     with db() as c:
         for t, rs in (("history", h), ("reminders", r), ("events", e), ("notes", n)):
             for x in rs: c.execute(f"UPDATE {t} SET synced=1 WHERE id=?", (x["id"],))
+_PUSHED = {}
+def push_settings(user_id, token):
+    with db() as c: rs = c.execute("SELECT k,v FROM settings WHERE user_id=?", (user_id,)).fetchall()
+    d = {r["k"]: r["v"] for r in rs if r["k"] in ("voice", "speak", "browser", "cite")}
+    if not d or _PUSHED.get(user_id) == d: return
+    req = urllib.request.Request(CLOUD + "/api/settings", json.dumps(d).encode(), {"Content-Type": "application/json", "Authorization": "Bearer " + token}, method="PUT")
+    urllib.request.urlopen(req, timeout=4).read(); _PUSHED[user_id] = d
 def sync_all():
     with db() as c: users = c.execute("SELECT * FROM cloud").fetchall()
     for u in users:
-        try: sync_user(u["user_id"], u["token"]); SYNC.update(last=datetime.now().isoformat(timespec="seconds"), error=None)
+        try: sync_user(u["user_id"], u["token"]); push_settings(u["user_id"], u["token"]); SYNC.update(last=datetime.now().isoformat(timespec="seconds"), error=None)
         except urllib.error.HTTPError as e:
             if e.code == 401:
                 with db() as c: c.execute("DELETE FROM cloud WHERE user_id=?", (u["user_id"],))
@@ -646,14 +704,23 @@ def sync_loop():
 threading.Thread(target=sync_loop, daemon=True).start()
 
 # ---------- reminder scheduler ----------
+def ring(kind, text, voice, spoken):
+    loud = kind in ("alarm", "timer")
+    if IS_MAC: threading.Thread(target=lambda: osa('display alert "Axor " & ' + json.dumps(kind) + ' message ' + json.dumps(text) + ' giving up after 300'), daemon=True).start()
+    for i in range(8 if loud else 1):
+        notify("Axor " + kind, text)
+        if IS_MAC and loud: sh(["afplay", "/System/Library/Sounds/Sosumi.aiff"])
+        if i == 1 and IS_MAC and (spoken or loud): speak(("Alarm: " if kind == "alarm" else "Reminder: ") + text, voice)
+        if not loud: break
+        time.sleep(2)
 def scheduler():
     while True:
         try:
             with db() as c:
                 for r in c.execute("SELECT * FROM reminders WHERE fired=0 AND due<=?", (datetime.now().isoformat(timespec="seconds"),)).fetchall():
                     c.execute("UPDATE reminders SET fired=1, synced=0 WHERE id=?", (r["id"],))
-                    notify("Axor " + r["kind"], r["text"]); CUR.uid = r["user_id"]; s = get_settings()
-                    if s["speak"] == "1": speak(f"Reminder: {r['text']}", s["voice"])
+                    CUR.uid = r["user_id"]; s = get_settings()
+                    threading.Thread(target=ring, args=(r["kind"], r["text"], s["voice"], s["speak"] == "1"), daemon=True).start()
         except Exception as e: print("scheduler:", e)
         time.sleep(3)
 threading.Thread(target=scheduler, daemon=True).start()
@@ -907,6 +974,20 @@ def api_attach():
     cat, resp, ok = analyze_file(path, name, mime, q); ms = int((time.time() - t0) * 1000)
     log_msg(q, "text", cat, resp, ok, ms, conv, name)
     return jsonify(response=resp, category=cat, ok=ok, ms=ms, conv=conv, att=name)
+def load_audio(path, sr=16000):
+    """Decode a recording to 16 kHz mono float32 without relying on newer av options."""
+    import av, numpy as np
+    out = []
+    with av.open(path) as c:
+        rs = av.audio.resampler.AudioResampler(format="s16", layout="mono", rate=sr)
+        for fr in c.decode(audio=0):
+            r = rs.resample(fr); r = r if isinstance(r, list) else [r]
+            out += [x.to_ndarray().reshape(-1) for x in r if x is not None]
+        try:
+            r = rs.resample(None); r = r if isinstance(r, list) else [r]
+            out += [x.to_ndarray().reshape(-1) for x in r if x is not None]
+        except Exception: pass
+    return (np.concatenate(out).astype(np.float32) / 32768.0) if out else np.zeros(0, dtype=np.float32)
 @app.post("/api/transcribe")
 def api_transcribe():
     f = request.files.get("audio")
@@ -914,7 +995,7 @@ def api_transcribe():
     p = tempfile.mktemp(suffix=".webm"); f.save(p); t0 = time.time()
     try:
         lang = {"en": "en", "hi": "hi"}.get(get_settings()["lang"])  # "auto" -> Whisper detects (English/Hindi mix)
-        segs, _ = whisper().transcribe(p, language=lang, beam_size=1, vad_filter=True)
+        segs, _ = whisper().transcribe(load_audio(p), language=lang, beam_size=1, vad_filter=True)
         text = " ".join(s.text.strip() for s in segs).strip()
     except Exception as e: return jsonify(error=str(e)), 500
     finally: os.path.exists(p) and os.remove(p)

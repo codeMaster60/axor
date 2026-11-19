@@ -58,7 +58,7 @@ function Settings({ theme, setTheme }) {
   const [s, setS] = useState({}); useEffect(() => { j("/settings").then(setS); }, []); const put = async (k, v) => setS(await j("/settings", { method: "PUT", body: JSON.stringify({ [k]: v }) }));
   return <><h1>Settings</h1><p className="sub">Stored in the cloud, per account.</p><div className="panel">
     <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}><span>Theme</span><select value={theme} onChange={e => setTheme(e.target.value)}><option value="dark">Dark</option><option value="light">Light</option></select></div>
-    <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}><span>Voice</span><select value={s.voice || "Daniel"} onChange={e => put("voice", e.target.value)}><option>Daniel</option><option>Tara</option><option>Samantha</option></select></div>
+    <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}><span>Voice</span><select value={s.voice || "Daniel"} onChange={e => put("voice", e.target.value)}><option>Daniel</option><option>Tara</option><option>Samantha</option><option>Ava (Premium)</option><option>Moira</option></select></div>
     <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}><span>Speak replies to voice commands</span><select value={s.speak || "1"} onChange={e => put("speak", e.target.value)}><option value="1">On</option><option value="0">Off</option></select></div></div></>;
 }
 function Chats() {
