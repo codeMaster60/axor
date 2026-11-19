@@ -1,4 +1,4 @@
-"""Axor Cloud: REST backend (Flask). JWT (HS256) auth, 25 endpoints, rate limiting, offline-sync target.
+"""Axor Cloud: REST backend (Flask). JWT (HS256) auth, 35 endpoints, rate limiting, offline-sync target.
 Run: python cloud.py  ->  http://localhost:8080  (serves the React dashboard too)"""
 import os, re, io, csv, json, time, hmac, base64, hashlib, secrets, sqlite3, collections
 from datetime import datetime, timedelta
@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS commands(id INTEGER PRIMARY KEY, user_id INT, cid TEX
 CREATE TABLE IF NOT EXISTS reminders(id INTEGER PRIMARY KEY, user_id INT, cid TEXT, text TEXT, due TEXT, fired INT DEFAULT 0, kind TEXT, UNIQUE(user_id,cid));
 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, user_id INT, cid TEXT, title TEXT, start TEXT, UNIQUE(user_id,cid));
 CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY, user_id INT, cid TEXT, ts TEXT, text TEXT, UNIQUE(user_id,cid));
-CREATE TABLE IF NOT EXISTS settings(user_id INT, k TEXT, v TEXT, PRIMARY KEY(user_id,k));""")
+CREATE TABLE IF NOT EXISTS settings(user_id INT, k TEXT, v TEXT, PRIMARY KEY(user_id,k));
+CREATE TABLE IF NOT EXISTS sessions(id INTEGER PRIMARY KEY, user_id INT, ts TEXT, ip TEXT, agent TEXT);
+CREATE TABLE IF NOT EXISTS conversations(id INTEGER PRIMARY KEY, user_id INT, cid TEXT, title TEXT, n INT, last TEXT, UNIQUE(user_id,cid));
+CREATE TABLE IF NOT EXISTS files(id INTEGER PRIMARY KEY, user_id INT, cid TEXT, name TEXT, url TEXT, ts TEXT, UNIQUE(user_id,cid));""")
 
 
 # ---------- cache: Redis when REDIS_URL is set, otherwise in-process (same interface) ----------
@@ -90,7 +93,11 @@ def sec(r):
 def body(): return request.get_json(silent=True) or {}
 rows = lambda q, a=(): [dict(r) for r in db().execute(q, a)]
 
-# ---------- auth (3) ----------
+# ---------- auth (4) ----------
+def log_session(uid):
+    try:
+        with db() as c: c.execute("INSERT INTO sessions(user_id,ts,ip,agent) VALUES(?,?,?,?)", (uid, datetime.now().isoformat(timespec="seconds"), request.remote_addr, (request.headers.get("User-Agent") or "")[:120]))
+    except Exception: pass
 @app.post("/api/auth/register")
 def register():
     d = body(); n = (d.get("username") or "").strip().lower(); p = d.get("password") or ""
@@ -100,12 +107,16 @@ def register():
     try:
         with db() as c: cur = c.execute("INSERT INTO users(username,salt,pw,created) VALUES(?,?,?,?)", (n, salt, hpw(p, salt), datetime.now().isoformat(timespec="seconds")))
     except sqlite3.IntegrityError: return jsonify(error="That username is taken"), 409
-    return jsonify(token=jwt_make(cur.lastrowid, n), username=n), 201
+    log_session(cur.lastrowid); return jsonify(token=jwt_make(cur.lastrowid, n), username=n), 201
 @app.post("/api/auth/login")
 def login():
     d = body(); n = (d.get("username") or "").strip().lower(); r = db().execute("SELECT * FROM users WHERE username=?", (n,)).fetchone()
     if not r or not hmac.compare_digest(r["pw"], hpw(d.get("password") or "", r["salt"])): return jsonify(error="Wrong username or password"), 401
-    return jsonify(token=jwt_make(r["id"], n), username=n)
+    log_session(r["id"]); return jsonify(token=jwt_make(r["id"], n), username=n)
+@app.post("/api/auth/refresh")
+def refresh():
+    r = db().execute("SELECT username FROM users WHERE id=?", (g.uid,)).fetchone()
+    return (jsonify(token=jwt_make(g.uid, r["username"]), username=r["username"]) if r else (jsonify(error="unauthorized"), 401))
 @app.get("/api/auth/me")
 def me():
     r = db().execute("SELECT id,username,created FROM users WHERE id=?", (g.uid,)).fetchone(); return jsonify(dict(r)) if r else (jsonify(error="unauthorized"), 401)
@@ -163,7 +174,7 @@ crud("reminders", ["text", "due"], "fired, due"); crud("events", ["title", "star
 # ---------- sync (1): idempotent batch upload from the offline client ----------
 @app.post("/api/sync")
 def sync():
-    d = body(); n = {"commands": 0, "reminders": 0, "events": 0, "notes": 0}
+    d = body(); n = {"commands": 0, "reminders": 0, "events": 0, "notes": 0, "conversations": 0}
     with db() as c:
         for x in d.get("commands", [])[:500]: save_cmd(c, x, x.get("cid")); n["commands"] += 1
         for x in d.get("reminders", [])[:500]:
@@ -172,7 +183,43 @@ def sync():
             c.execute("INSERT OR REPLACE INTO events(user_id,cid,title,start) VALUES(?,?,?,?)", (g.uid, x["cid"], x["title"], x["start"])); n["events"] += 1
         for x in d.get("notes", [])[:500]:
             c.execute("INSERT OR REPLACE INTO notes(user_id,cid,ts,text) VALUES(?,?,?,?)", (g.uid, x["cid"], x["ts"], x["text"])); n["notes"] += 1
+        for x in d.get("conversations", [])[:500]:
+            c.execute("INSERT OR REPLACE INTO conversations(user_id,cid,title,n,last) VALUES(?,?,?,?,?)", (g.uid, x["cid"], str(x.get("title") or "Chat")[:120], int(x.get("n", 0)), x.get("last", ""))); n["conversations"] += 1
     return jsonify(ok=True, synced=n)
+
+# ---------- conversations, files, reminders/settings aliases, monthly analytics (10) ----------
+@app.post("/api/conversations/save")
+def conv_save():
+    d = body()
+    if not d.get("title"): return jsonify(error="title required"), 400
+    with db() as c: c.execute("INSERT OR REPLACE INTO conversations(user_id,cid,title,n,last) VALUES(?,?,?,?,?)", (g.uid, d.get("cid") or secrets.token_hex(8), str(d["title"])[:120], int(d.get("n", 0)), d.get("last") or datetime.now().isoformat(timespec="seconds")))
+    return jsonify(ok=True), 201
+@app.get("/api/conversations/list")
+def conv_list(): return jsonify(rows("SELECT * FROM conversations WHERE user_id=? ORDER BY last DESC LIMIT 200", (g.uid,)))
+@app.post("/api/files/upload")
+def file_up():
+    d = body()
+    if not (d.get("name") and str(d.get("url", "")).startswith("https://")): return jsonify(error="name and https url required"), 400
+    with db() as c: c.execute("INSERT OR IGNORE INTO files(user_id,cid,name,url,ts) VALUES(?,?,?,?,?)", (g.uid, d.get("cid") or secrets.token_hex(8), str(d["name"])[:200], d["url"][:500], datetime.now().isoformat(timespec="seconds")))
+    return jsonify(ok=True), 201
+@app.get("/api/files")
+def file_list(): return jsonify(rows("SELECT * FROM files WHERE user_id=? ORDER BY id DESC LIMIT 200", (g.uid,)))
+@app.delete("/api/files/<int:i>")
+def file_del(i):
+    with db() as c: n = c.execute("DELETE FROM files WHERE id=? AND user_id=?", (i, g.uid)).rowcount
+    return (jsonify(ok=True) if n else (jsonify(error="not found"), 404))
+@app.post("/api/reminders/create")
+def rem_create():
+    d = body(); miss = [k for k in ("text", "due") if not d.get(k)]
+    if miss: return jsonify(error="missing: " + ", ".join(miss)), 400
+    with db() as c: c.execute("INSERT OR IGNORE INTO reminders(user_id,cid,text,due,kind) VALUES(?,?,?,?,?)", (g.uid, d.get("cid") or secrets.token_hex(8), str(d["text"]), str(d["due"]), d.get("kind", "reminder")))
+    return jsonify(ok=True), 201
+@app.get("/api/reminders/upcoming")
+def rem_upcoming(): return jsonify(rows("SELECT * FROM reminders WHERE user_id=? AND fired=0 AND due>=? ORDER BY due LIMIT 50", (g.uid, datetime.now().isoformat(timespec="minutes"))))
+@app.put("/api/settings/update")
+def st_update(): return st_put()
+@app.get("/api/analytics/monthly")
+def a_month(): return cached("month", lambda: rows("SELECT substr(ts,1,7) month, COUNT(*) n, ROUND(AVG(ms),1) avg_ms FROM commands WHERE user_id=? GROUP BY month ORDER BY month DESC LIMIT 12", (g.uid,))[::-1])
 
 # ---------- analytics (4) + health (1) ----------
 @app.get("/api/analytics/summary")

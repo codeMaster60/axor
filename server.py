@@ -303,7 +303,12 @@ def run_command(raw):
         p = os.path.expanduser(f"~/Desktop/Axor_{datetime.now():%Y%m%d_%H%M%S}.png"); ok, _ = sh(["screencapture", "-x", p])
         extra = ""
         if ok and ig.cloudinary_configured() and online():
-            try: extra = " Uploaded: " + ig.cloudinary_upload(p)
+            try:
+                url = ig.cloudinary_upload(p); extra = " Uploaded: " + url
+                try:
+                    with db() as c: tk = c.execute("SELECT token FROM cloud WHERE user_id=?", (uid(),)).fetchone()
+                    if tk: cloud_req("/api/files/upload", {"name": os.path.basename(p), "url": url}, tk["token"])
+                except Exception: pass
             except Exception as e: extra = " (Cloud upload failed.)"
         return "system", (("Screenshot saved to your Desktop." + extra) if ok else "Screenshot failed. Allow Screen Recording for your terminal."), ok
     if re.search(r"lock (the )?(screen|mac)", t):
@@ -583,9 +588,13 @@ def ext_push(username, pay):
     try:
         if ig.firebase_configured() and username in ig._fb:
             for kind, rows in pay.items():
-                for x in rows: ig.firebase_push(username, kind, x["cid"], {k: v for k, v in x.items() if k != "cid"})
+                try:
+                    for x in rows: ig.firebase_push(username, kind, x["cid"], {k: v for k, v in x.items() if k != "cid"})
+                except Exception as e: print(f"external sync (firebase {kind}):", e)
         if ig.supabase_configured():
-            for kind, rows in pay.items(): ig.supabase_push(username, kind, rows)
+            for kind, rows in pay.items():
+                try: ig.supabase_push(username, kind, rows)
+                except Exception as e: print(f"external sync (supabase {kind}):", e)
     except Exception as e: print("external sync:", e)
 def sync_user(user_id, token):
     with db() as c:
@@ -598,6 +607,11 @@ def sync_user(user_id, token):
            "reminders": [{"cid": f"{user_id}-r-{x['id']}", "text": x["text"], "due": x["due"], "fired": x["fired"], "kind": x["kind"]} for x in r],
            "events": [{"cid": f"{user_id}-e-{x['id']}", "title": x["title"], "start": x["start"]} for x in e],
            "notes": [{"cid": f"{user_id}-n-{x['id']}", "ts": x["ts"], "text": x["text"]} for x in n]}
+    with db() as c:
+        cv = c.execute("""SELECT h.conv, COUNT(*) n, MAX(h.ts) last, (SELECT title FROM chat_titles t WHERE t.user_id=h.user_id AND t.conv=h.conv) title,
+            (SELECT command FROM history x WHERE x.user_id=h.user_id AND x.conv=h.conv ORDER BY x.id LIMIT 1) first
+            FROM history h WHERE h.user_id=? AND h.conv IS NOT NULL GROUP BY h.conv ORDER BY MAX(h.id) DESC LIMIT 100""", (user_id,)).fetchall()
+    pay["conversations"] = [{"cid": f"{user_id}-c-{x['conv']}", "title": x["title"] or wt.smart_title(x["first"] or ""), "n": x["n"], "last": x["last"]} for x in cv]
     cloud_req("/api/sync", pay, token)
     with db() as c: un = c.execute("SELECT username FROM users WHERE id=?", (user_id,)).fetchone()
     if un and (ig.firebase_configured() or ig.supabase_configured()): ext_push(un["username"], pay)
@@ -755,6 +769,18 @@ def index(): return send_from_directory(BASE, "index.html")
 @app.post("/api/command")
 def api_command():
     d = request.get_json(force=True); CUR.web = bool(d.get("web")); return jsonify(handle((d.get("text") or "").strip(), d.get("source", "text"), d.get("conv")))
+@app.get("/api/gmail/unread")
+def api_gmail_unread():
+    if not ig.google_connected(): return jsonify(error="Google not connected"), 409
+    try: return jsonify(ig.gmail_unread(5))
+    except Exception as e: return jsonify(error=str(e)[:150]), 502
+@app.post("/api/calendar/event")
+def api_calendar_event():
+    d = request.get_json(force=True); t = (d.get("title") or "").strip(); st = d.get("start")
+    if not (t and st): return jsonify(error="title and start required"), 400
+    if not ig.google_connected(): return jsonify(error="Google not connected"), 409
+    try: return jsonify(ok=True, link=ig.calendar_insert(t, datetime.fromisoformat(st)))
+    except Exception as e: return jsonify(error=str(e)[:150]), 502
 @app.get("/api/chats")
 def api_chats():
     q = request.args.get("q", "").strip()

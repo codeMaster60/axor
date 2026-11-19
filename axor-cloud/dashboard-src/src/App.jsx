@@ -61,6 +61,17 @@ function Settings({ theme, setTheme }) {
     <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}><span>Voice</span><select value={s.voice || "Daniel"} onChange={e => put("voice", e.target.value)}><option>Daniel</option><option>Tara</option><option>Samantha</option></select></div>
     <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}><span>Speak replies to voice commands</span><select value={s.speak || "1"} onChange={e => put("speak", e.target.value)}><option value="1">On</option><option value="0">Off</option></select></div></div></>;
 }
+function Chats() {
+  const [r, setR] = useState(null); useEffect(() => { j("/conversations/list").then(setR); }, []);
+  return <><h1>Chats</h1><p className="sub">Every conversation synced from Axor.</p>
+    <div className="panel" style={{ overflowX: "auto" }}>{r && r.length ? <table><thead><tr><th>Title</th><th>Messages</th><th>Last activity</th></tr></thead><tbody>{r.map(x => <tr key={x.id}><td>{x.title}</td><td>{x.n}</td><td style={{ color: "var(--mut)", whiteSpace: "nowrap" }}>{(x.last || "").replace("T", " ")}</td></tr>)}</tbody></table> : <Empty t={r ? "No conversations synced yet." : "Loading..."} />}</div></>;
+}
+function Files() {
+  const [r, setR] = useState(null), load = useCallback(() => j("/files").then(setR), []); useEffect(() => { load(); }, [load]);
+  const del = async i => { await api("/files/" + i, { method: "DELETE" }); load(); };
+  return <><h1>Files</h1><p className="sub">Screenshots and documents Axor uploaded to Cloudinary.</p>
+    <div className="panel" style={{ overflowX: "auto" }}>{r && r.length ? <table><thead><tr><th>Name</th><th>Uploaded</th><th></th></tr></thead><tbody>{r.map(x => <tr key={x.id}><td><a className="link" href={x.url} target="_blank" rel="noreferrer">{x.name}</a></td><td style={{ color: "var(--mut)", whiteSpace: "nowrap" }}>{x.ts.replace("T", " ")}</td><td><button className="btn g" onClick={() => del(x.id)}>Remove</button></td></tr>)}</tbody></table> : <Empty t={r ? "No files uploaded yet. Say 'take a screenshot' in Axor." : "Loading..."} />}</div></>;
+}
 const IC = {
   overview: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
   history: "M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm-1 5v5l4 2 .8-1.5-3.3-1.6V8H12z",
@@ -68,17 +79,19 @@ const IC = {
   calendar: "M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 8h14v10H5V10z",
   reminders: "M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 0 0-5-5.9V4a1 1 0 0 0-2 0v1.1A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2z",
   notes: "M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6zm7 1.5L18.5 9H13V3.5zM8 13h8v2H8v-2zm0 4h8v2H8v-2z",
+  chats: "M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z",
+  files: "M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z",
   settings: "M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 3a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 3h4l.4-3c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4-2.2-1.6zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z",
 };
 const Icon = ({ k }) => <svg className="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={IC[k]} /></svg>;
-const PAGES = [["overview", "Overview"], ["history", "History"], ["analytics", "Analytics"], ["calendar", "Calendar"], ["reminders", "Reminders"], ["notes", "Notes"], ["settings", "Settings"]];
+const PAGES = [["overview", "Overview"], ["history", "History"], ["chats", "Chats"], ["analytics", "Analytics"], ["calendar", "Calendar"], ["reminders", "Reminders"], ["notes", "Notes"], ["files", "Files"], ["settings", "Settings"]];
 export default function App() {
   const [user, setUser] = useState(null), [page, setPage] = useState("overview"), [theme, setTheme] = useState(() => { try { return localStorage.getItem("axor_theme") || "dark"; } catch { return "dark"; } });
   useEffect(() => { document.documentElement.dataset.theme = theme; try { localStorage.setItem("axor_theme", theme); } catch {} }, [theme]);
   useEffect(() => { if (tk()) api("/auth/me").then(r => r.ok ? r.json() : null).then(d => d && setUser(d.username)).catch(() => {}); const h = () => setUser(null); window.addEventListener("axor-logout", h); return () => window.removeEventListener("axor-logout", h); }, []);
   if (!user) return <Auth onIn={setUser} />;
   const out = () => { try { localStorage.removeItem("axor_cloud_t"); } catch {} setUser(null); };
-  const P = { overview: <Overview />, history: <History />, analytics: <Analytics />, settings: <Settings theme={theme} setTheme={setTheme} />,
+  const P = { overview: <Overview />, history: <History />, analytics: <Analytics />, chats: <Chats />, files: <Files />, settings: <Settings theme={theme} setTheme={setTheme} />,
     calendar: <Simple key="events" name="events" title="Calendar" sub="Meetings Axor scheduled." cols={["When", "Title"]} fields={[{ k: "title", p: "Meeting title" }, { k: "start", type: "datetime-local" }]} render={x => <><td>{x.start.replace("T", " ")}</td><td>{x.title}</td></>} />,
     reminders: <Simple key="reminders" name="reminders" title="Reminders" sub="Reminders, alarms and timers." cols={["When", "What", "Status"]} fields={[{ k: "text", p: "Reminder text" }, { k: "due", type: "datetime-local" }]} render={x => <><td>{x.due.replace("T", " ")}</td><td>{x.text}</td><td><span className={"chip " + (x.fired ? "ok" : "wait")}>{x.fired ? "Done" : "Pending"}</span></td></>} />,
     notes: <Simple key="notes" name="notes" title="Notes" sub="Notes taken by voice or text." cols={["Saved", "Note"]} fields={[{ k: "text", p: "Write a note" }]} render={x => <><td style={{ color: "var(--mut)", whiteSpace: "nowrap" }}>{x.ts.replace("T", " ")}</td><td>{x.text}</td></>} /> };

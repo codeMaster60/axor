@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import sys, json, time, io
 sys.path.insert(0, '.')
 import server as s
@@ -83,7 +84,7 @@ r = R("schedule a meeting with rahul tomorrow at 5 pm"); chk("meeting", r["ok"] 
 chk("meeting ics opened", any(isinstance(x, list) and x[:3] == ["open", "-a", "Calendar"] and x[3].endswith(".ics") for x in calls), calls[-3:])
 import glob, os
 ics = sorted(glob.glob(os.path.join(os.path.dirname(s.__file__), "meetings", "*.ics")))
-chk("ics file valid", ics and "BEGIN:VEVENT" in open(ics[-1]).read() and "DTSTART:20261119T170000" in open(ics[-1]).read())
+chk("ics file valid", ics and "BEGIN:VEVENT" in open(ics[-1]).read() and ("DTSTART:%sT170000" % (datetime.now() + timedelta(days=1)).strftime("%Y%m%d")) in open(ics[-1]).read())
 chk("event stored", len(c.get("/api/events", headers=H(t1)).json) == 1)
 chk("event isolation", c.get("/api/events", headers=H(t2)).json == [])
 r = R("schedule a meeting"); chk("meeting bare", r["ok"], r)
