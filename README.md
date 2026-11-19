@@ -1,96 +1,113 @@
-# Axor — local voice assistant with offline-first cloud sync
+# Axor
 
-## Run (Mac)
-```
-cd ~/axor && source venv/bin/activate
-pip install -r requirements.txt
-./start.sh            # starts both services
-```
-- Assistant (voice + text): http://localhost:8765
-- Web dashboard (React):    http://localhost:8080
-- First run: Whisper downloads its model once (needs internet). After that speech recognition is fully offline.
-- System Settings -> Privacy: allow Microphone for your browser, Accessibility for Terminal (WhatsApp auto-send), Contacts.
+**A voice assistant that still works when the Wi-Fi doesn't.**
 
-## What works offline and what needs internet
-| Feature | Offline | Online |
-|---|---|---|
-| Typed and spoken commands (apps, volume, screenshot, notes, reminders, timers, meetings as .ics, time, date, battery, calculator) | Yes | Yes |
-| Speech recognition (Whisper, after its one-time download) | Yes | Yes |
-| Maths: solve, differentiate, integrate, limits, factor, expand, simplify (SymPy), shown as typeset equations | Yes | Yes |
-| Equations and Markdown rendering (KaTeX is bundled in `static/vendor`, no CDN) | Yes | Yes |
-| Chats (auto-named, searchable, renameable), Today agenda, Skills, Insights, Save as image / Save text | Yes | Yes |
-| Attach and read: PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), OpenDocument, EPUB, RTF, CSV, JSON, Markdown, HTML, text, code, notebooks (text extraction is offline; basic summary offline, full AI analysis online) | Yes | Full AI analysis |
-| Attach images (PNG, JPG, WebP, GIF) | Saved only, honest message | AI reads them (cloud vision model) |
-| Old binary Office files (.doc .xls .ppt) | Approximate text only (said in the reply) | Same |
-| Pictures: real photos from Wikipedia / Wikimedia Commons with credits; generated artwork (Pollinations, never real people) | No (honest message) | Yes, no key needed |
-| Factual answers with a numbered Sources list (Wikipedia + DuckDuckGo results, switch off in Settings) | No | Yes |
-| Audio and video files (MP3, MP4, WAV, M4A...): transcribed on this Mac with Whisper, then summarized (summary needs internet; sound only, video frames are not viewed) | Transcript yes | Transcript + summary |
-| ZIP files: file list plus the text of readable files inside | Yes | Yes |
-| Open questions, step-by-step solutions to any problem, explanations | No | Yes (Groq) |
-| Gmail, Google Calendar, Firebase, Supabase, Cloudinary sync | Queued / skipped | Yes |
+Most assistants send every request to a server. No internet, no assistant. Your voice also leaves your laptop every time.
 
-## Brand
-`brand/` holds the logo (SVG, PNG 64 to 1024) and light/dark lockups. The same SVG is `static/logo.svg` (used by the app, dashboard and landing page).
+Setting an alarm doesn't need a data centre. So I built one that doesn't use one.
 
-## Chats
-Each conversation is one chat. Follow-up questions are sent with the earlier messages as context. "New chat" starts a fresh one; old chats are listed in the sidebar, can be reopened and deleted. Older history is grouped into one chat per day automatically.
+Axor is a local-first voice and text assistant for macOS. The everyday commands run on your own machine. The internet is only used when a question really needs it.
 
-## What is built
-| Part | Tech | Notes |
-|---|---|---|
-| Voice input | Browser mic -> faster-whisper (base, int8) | Offline. Hindi/English/auto in Settings. |
-| Command engine | Python rule-based router | open/close apps, websites, YouTube/Google search, volume, screenshot, lock, battery, time/date, calculator, notes, reminders/alarms/timers, meetings (.ics into Calendar, works offline), WhatsApp send (Contacts + AppleScript) |
-| AI answers | Groq Llama (online only) | Tries several model names. Offline: clear message. |
-| Local store | SQLite | history, analytics, reminders, notes, events, settings, per-user |
-| Auth | PBKDF2 passwords + signed tokens | sign-up / sign-in on the assistant |
-| Cloud backend | Python (Flask) REST API | 25 endpoints, JWT (HS256), rate limit 100 req/min, security headers, idempotent sync |
-| Sync | SQLite queue -> /api/sync | Works offline; catches up on reconnect. Status shown in sidebar. |
-| Dashboard | React 18 + Recharts (Vite build) | Login/Sign-up, Overview, History, Analytics, Calendar, Reminders, Notes, Settings; dark/light; mobile responsive |
+Built as our Capstone Project at VIT-AP University (CSBS).
 
-## Integrations (code written; need YOUR accounts/keys, see SETUP.md)
-| Part | Status |
+## What it does, with no internet
+
+- Opens apps and websites
+- Sets alarms, reminders and timers, and rings them out loud
+- Takes notes and reads them back
+- Schedules meetings as `.ics` files
+- Solves maths: equations, derivatives, integrals, limits. Shown as typeset equations
+- Controls volume, locks the screen, takes screenshots, tells battery, time and date
+- Listens to your voice with Whisper, on your own machine
+
+## What needs internet, and it says so
+
+- Open questions and explanations (Groq Llama)
+- Photos, sources, Gmail and Google Calendar
+- Cloud sync
+
+When you're offline and ask something that needs the internet, Axor tells you. It never pretends.
+
+## How it works
+
+1. You speak or type.
+2. Whisper turns speech into text on your machine.
+3. A rule-based engine cleans the sentence ("set and alarm" becomes "set an alarm") and runs the command.
+4. If the rules fail and you're online, a language model rewrites the sentence once, and the rules try again.
+5. If a model claims it did something it didn't, Axor replaces the claim with an honest message.
+6. The result goes into SQLite. Every 4 seconds, anything unsynced goes to Axor Cloud.
+
+Work done offline waits in the queue. When the connection comes back, it syncs, with no duplicates.
+
+## Numbers I measured
+
+| What | Result |
 |---|---|
-| Gmail read/summary, Google Calendar events (OAuth 2.0 + PKCE) | Written. Tested against **simulated** Google responses (token exchange, refresh, request shape). Not yet run against real Google. |
-| Firebase Auth + Firestore sync | Written (REST). Tested against simulated responses only. |
-| Supabase (PostgREST upsert) | Written. Tested against simulated responses only. |
-| Cloudinary screenshot upload | Written (signed upload, signature verified in test). Not run against real Cloudinary. |
-| Redis cache for analytics | **Tested against a real redis-server** (hit ratio measured). Falls back to in-memory. |
-| Selenium web search | Written. Real-browser test skipped here (driver/Chrome version mismatch); run on your Mac. |
-| Deploy files (Procfile, Dockerfile) | Written. Not deployed. |
+| Intent accuracy (63-command test set, offline) | 63 / 63 |
+| Command engine latency, 378 runs | mean 0.4 ms, p95 1.3 ms, p99 4.6 ms |
+| Automated checks | 393 passing |
+| Cloud API | 35 endpoints |
+| Our own security audit | 18 / 18 |
+| Rate limit | 130 rapid requests: 100 OK, 30 rejected (429) |
 
-## Calendar, documents, editing and colours
-- "What's on my calendar today / tomorrow / on 18 November / this week" reads your Google Calendar (after `connect Google`).
-- Asking for an assignment, essay, report or letter produces an editable document card with Copy and Download .docx. The AI writes placeholders for anything it does not know; check facts and references before submitting.
-- Hover a message you sent and press Edit to change it. The old reply is dropped and a new one is generated.
-- Settings > Appearance: presets and three colour pickers (accent, glow, background); saved in this browser.
-- Text replies have Copy only. Downloads exist for images, documents and files.
+The latency is the engine itself, with system calls stubbed. It does not include the time macOS takes to open an app.
 
-## Images, sources and chat names
-Ask for pictures in plain words ("show me photos of the Taj Mahal", "generate an image of a dragon"). Photos come from Wikipedia and Wikimedia Commons and every picture carries its credit and a source link. Generated images use Pollinations (free, no key); Axor does not generate pictures of real people and shows real photos instead. Click a picture to enlarge, then Save image. Factual questions are answered from search results with [1], [2] citations and a Sources list. Chats are named from what you discussed (a short AI title when online, a smart local title offline); double-click a chat in the sidebar to rename it. Image and source lookups were tested against mocked responses only; they depend on those public sites being reachable from your Mac.
+Load test (20 concurrent clients, 10 s, 2-core sandbox, Flask dev server): 278 req/s mixed read/write, 471 req/s read-only dashboard. Writes slow down at the tail because SQLite has one writer. Postgres would fix that.
 
-## Skills
-The Skills page has a library of 23 skills (writing, study, coding, research, work, everyday), a My skills tab, and a Commands tab. Press Add to install a skill, switch it on or off from the page or from the sparkle button in the chat box, remove it, or write your own. Up to 5 can be on at once; each one adds its instructions to Axor's AI prompt while on. The library is Axor's own set of skill packs, not a live download from an outside marketplace, and skills affect AI answers only (not local commands such as opening apps).
+## Run it (Mac)
 
-## What is NOT built (do not claim)
-Spring Boot (backend is Flask), Windows version (design doc only), Framer landing page (HTML landing page only), any real Railway/Vercel deployment, third-party penetration test (we ran our own audit).
+```bash
+git clone https://github.com/codeMaster60/axor.git
+cd axor
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+./start.sh
+```
 
-## Tests and measurements (all run in a Linux sandbox; rerun on your Mac)
-- `python test_axor.py`            99 checks (assistant API, auth, commands) - system calls stubbed
-- `python test_docgen.py`          18 checks (dates, document detection, .docx)
-- `python test_integrations.py`    36 checks (simulated Google/Firebase/Supabase/Cloudinary)
-- `python test_web.py`             27 checks (image intent, photo/generate flows, citations, titles, Today API; HTTP mocked)
-- `python test_chats.py`           36 checks (chats, attachments, offline maths, model discovery; Groq simulated)
-- `cd axor-cloud && python test_cloud.py`  73 checks (cloud API, JWT, rate limit, sync)
-- `cd axor-cloud && python security_audit.py`  18 checks (our own audit: auth, JWT tamper/alg=none, isolation, SQLi, headers, hashing). Rate limit verified: 130 rapid requests -> 100 OK, 30 x 429.
-- `cd axor-cloud && python loadtest.py http://127.0.0.1:8080 20 10 [readonly]`  load test
-- `python bench.py` intent accuracy + engine latency; `python bench.py --stt` (Mac) Whisper WER + latency
-- Postman: import `axor-cloud/Axor_Cloud.postman_collection.json` (25 requests)
+- Assistant (voice and text): http://localhost:8765
+- Dashboard: http://localhost:8080
 
-### Measured load test (2-core sandbox, Flask dev server, 20 concurrent clients, 10 s)
-| Scenario | Throughput | p50 | p95 | p99 | Cache hit |
-|---|---|---|---|---|---|
-| Mixed read/write, memory cache | 278 req/s | 21.7 ms | 240 ms | 1059 ms | 0.5% |
-| Mixed read/write, Redis | 258 req/s | 25.2 ms | 208 ms | 1299 ms | 0.7% |
-| Read-only dashboard, memory | 471 req/s | 39.7 ms | 65.7 ms | 77.8 ms | 100% |
-| Read-only dashboard, Redis | 408 req/s | 46.1 ms | 72.5 ms | 97.7 ms | 99.9% |
-Honest reading: caching only helps read-heavy dashboards; any write invalidates the user's cache. Write tail latency (p99 > 1 s) comes from SQLite's single writer; Postgres would fix that. Use these numbers, not invented ones.
+First run downloads the Whisper model once. After that, speech recognition is fully offline.
+Allow Microphone for your browser in System Settings > Privacy.
+
+## Dashboard
+
+Axor Cloud keeps a copy of your history, reminders, notes, events and settings. A React dashboard shows it: Overview, History, Chats, Analytics, Calendar, Reminders, Notes, Files, Settings.
+
+Passwords use PBKDF2 with a salt. Login tokens are signed JWTs. Every account only sees its own rows.
+
+## Tests
+
+```bash
+python test_axor.py
+python test_docgen.py
+python test_integrations.py
+python test_web.py
+python test_chats.py
+cd axor-cloud && python test_cloud.py && python security_audit.py
+python bench.py
+```
+
+## What is not built
+
+I'd rather say it here than have you find out.
+
+- The backend is Flask, not Spring Boot
+- No Windows version, only a design note
+- Nothing is deployed to a hosting service
+- Google, Firebase, Supabase and Cloudinary code was tested against simulated responses only
+- The security audit was ours, not a third-party penetration test
+- Alarms only fire while the Axor server is running
+
+Full feature tables and setup notes: [docs/DETAILS.md](docs/DETAILS.md) and [SETUP.md](SETUP.md).
+
+## Team
+
+| Name | Reg. No. |
+|---|---|
+| Jidiga Charan Reddy | 23BCB7120 |
+| Lingampally Sampath | 23BCB7136 |
+| A. Sai Jayanth | 23BCB7169 |
+| Nazeer Shaik | 23BCB7230 |
+
+Guide: Dr. Balaraju Ramesh, School of Computer Science and Engineering, VIT-AP University.
