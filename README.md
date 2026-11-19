@@ -1,60 +1,122 @@
+<div align="center">
+
+<img src="static/logo.svg" width="72" alt="Axor logo">
+
 # Axor
 
-**A voice assistant that still works when the Wi-Fi doesn't.**
+**i asked my assistant to set an alarm. the wifi was down. it did nothing.**
 
-Most assistants send every request to a server. No internet, no assistant. Your voice also leaves your laptop every time.
+A voice assistant for macOS that keeps working offline.
 
-Setting an alarm doesn't need a data centre. So I built one that doesn't use one.
+![Python](https://img.shields.io/badge/python-3.x-0f766e) ![Flask](https://img.shields.io/badge/flask-backend-0f766e) ![Whisper](https://img.shields.io/badge/whisper-offline%20speech-0f766e) ![React](https://img.shields.io/badge/react-dashboard-0f766e) ![Tests](https://img.shields.io/badge/checks-393%20passing-0f766e)
 
-Axor is a local-first voice and text assistant for macOS. The everyday commands run on your own machine. The internet is only used when a question really needs it.
+<img src="docs/img/ui_home.png" width="820" alt="Axor home screen">
 
-Built as our Capstone Project at VIT-AP University (CSBS).
+</div>
 
-## What it does, with no internet
+---
 
-- Opens apps and websites
-- Sets alarms, reminders and timers, and rings them out loud
-- Takes notes and reads them back
-- Schedules meetings as `.ics` files
-- Solves maths: equations, derivatives, integrals, limits. Shown as typeset equations
-- Controls volume, locks the screen, takes screenshots, tells battery, time and date
-- Listens to your voice with Whisper, on your own machine
+## why this exists
 
-## What needs internet, and it says so
+every voice assistant i used did the same thing. my voice goes to a server, the server thinks, the answer comes back.
 
-- Open questions and explanations (Groq Llama)
-- Photos, sources, Gmail and Google Calendar
-- Cloud sync
+no internet, no assistant. and every request leaves my laptop.
 
-When you're offline and ask something that needs the internet, Axor tells you. It never pretends.
+but setting an alarm doesn't need a data centre. neither does "open Safari", "note this down" or "what's 12 times 5".
 
-## How it works
+so we built Axor. the everyday commands run on your own machine. the internet is only used when a question really needs it.
 
-1. You speak or type.
-2. Whisper turns speech into text on your machine.
-3. A rule-based engine cleans the sentence ("set and alarm" becomes "set an alarm") and runs the command.
-4. If the rules fail and you're online, a language model rewrites the sentence once, and the rules try again.
-5. If a model claims it did something it didn't, Axor replaces the claim with an honest message.
-6. The result goes into SQLite. Every 4 seconds, anything unsynced goes to Axor Cloud.
+built as our Capstone Project at VIT-AP University (CSBS).
 
-Work done offline waits in the queue. When the connection comes back, it syncs, with no duplicates.
+---
 
-## Numbers I measured
+## what it does
 
-| What | Result |
+**works with no internet**
+
+- opens apps and websites
+- sets alarms, reminders and timers. they ring out loud, with a popup you can't miss
+- takes notes and reads them back
+- schedules meetings as `.ics` files
+- solves maths: equations, derivatives, integrals, limits. shown as proper equations
+- volume, lock screen, screenshot, battery, time, date
+- listens to your voice with Whisper, on your own machine. your audio never leaves it
+
+**needs internet, and tells you so**
+
+- open questions and explanations (Groq Llama)
+- photos with credits, sources, Gmail, Google Calendar
+- cloud sync
+
+if you're offline and ask something that needs the internet, Axor says so. it never pretends it did something it didn't.
+
+<img src="docs/img/ui_chat.png" width="820" alt="Chat with commands and a solved equation">
+
+---
+
+## the part i'm happiest with
+
+a lot of real use goes wrong in small ways.
+
+speech recognition hears "set **and** alarm" instead of "set **an** alarm". a language model replies "done, alarm set" when nothing was set. "7.33 pm" gets read as 9 am tomorrow.
+
+so most of the work wasn't new features. it was making the existing ones honest:
+
+- sentences get cleaned before the rules run
+- if the rules fail and you're online, a model rewrites the sentence once, and the rules try again
+- if a model claims it did something, the claim is replaced with an honest message and an example that works
+- alarms play a sound, speak, and show a popup
+
+---
+
+## how it works
+
+<img src="docs/img/g_arch.png" width="760" alt="Architecture">
+
+1. you speak or type
+2. Whisper turns speech into text on your machine
+3. a rule-based engine cleans the sentence and runs the command
+4. the result is saved to SQLite
+5. every 4 seconds, anything not yet synced goes to Axor Cloud
+
+work done offline waits in a queue. when the connection comes back, it syncs. no duplicates.
+
+<img src="docs/img/g_sync.png" width="640" alt="Offline queue and sync">
+
+---
+
+## the dashboard
+
+Axor Cloud keeps a copy of your history, reminders, notes, events and settings. a React dashboard shows it from any browser.
+
+<img src="docs/img/d_overview.png" width="820" alt="Dashboard overview">
+
+<img src="docs/img/d_history.png" width="820" alt="Dashboard history">
+
+passwords use PBKDF2 with a salt. login tokens are signed JWTs. every account only sees its own rows.
+
+---
+
+## numbers i measured
+
+| what | result |
 |---|---|
-| Intent accuracy (63-command test set, offline) | 63 / 63 |
-| Command engine latency, 378 runs | mean 0.4 ms, p95 1.3 ms, p99 4.6 ms |
-| Automated checks | 393 passing |
-| Cloud API | 35 endpoints |
-| Our own security audit | 18 / 18 |
-| Rate limit | 130 rapid requests: 100 OK, 30 rejected (429) |
+| intent accuracy (63-command test set, offline) | 63 / 63 |
+| command engine latency, 378 runs | mean 0.4 ms, p95 1.3 ms, p99 4.6 ms |
+| automated checks | 393 passing |
+| cloud API | 35 endpoints |
+| our own security audit | 18 / 18 |
+| rate limit | 130 rapid requests: 100 OK, 30 rejected (429) |
 
-The latency is the engine itself, with system calls stubbed. It does not include the time macOS takes to open an app.
+the latency is the engine itself, with system calls stubbed. it does not include the time macOS takes to open an app.
 
-Load test (20 concurrent clients, 10 s, 2-core sandbox, Flask dev server): 278 req/s mixed read/write, 471 req/s read-only dashboard. Writes slow down at the tail because SQLite has one writer. Postgres would fix that.
+load test (20 clients, 10 s, 2-core sandbox, Flask dev server): 278 req/s mixed read/write, 471 req/s read-only dashboard. writes slow down at the tail because SQLite has one writer. Postgres would fix that.
 
-## Run it (Mac)
+---
+
+## try it
+
+free, open source, runs on your Mac.
 
 ```bash
 git clone https://github.com/codeMaster60/axor.git
@@ -64,50 +126,56 @@ pip install -r requirements.txt
 ./start.sh
 ```
 
-- Assistant (voice and text): http://localhost:8765
-- Dashboard: http://localhost:8080
+- assistant (voice and text): http://localhost:8765
+- dashboard: http://localhost:8080
 
-First run downloads the Whisper model once. After that, speech recognition is fully offline.
-Allow Microphone for your browser in System Settings > Privacy.
+first run downloads the Whisper model once. after that, speech recognition is fully offline. allow Microphone for your browser in System Settings > Privacy.
 
-## Dashboard
+things to say:
 
-Axor Cloud keeps a copy of your history, reminders, notes, events and settings. A React dashboard shows it: Overview, History, Chats, Analytics, Calendar, Reminders, Notes, Files, Settings.
+```
+set an alarm for 7:30 pm
+remind me to submit the report in 10 minutes
+take a note finish capstone report
+schedule a meeting with rahul tomorrow at 5 pm
+solve x^2 - 5x + 6 = 0
+open youtube
+```
 
-Passwords use PBKDF2 with a salt. Login tokens are signed JWTs. Every account only sees its own rows.
-
-## Tests
+run the tests:
 
 ```bash
-python test_axor.py
-python test_docgen.py
-python test_integrations.py
-python test_web.py
-python test_chats.py
+python test_axor.py && python test_chats.py && python test_web.py
 cd axor-cloud && python test_cloud.py && python security_audit.py
 python bench.py
 ```
 
-## What is not built
+---
 
-I'd rather say it here than have you find out.
+## what's not built
 
-- The backend is Flask, not Spring Boot
-- No Windows version, only a design note
-- Nothing is deployed to a hosting service
+better you read it here than find out later.
+
+- the backend is Flask, not Spring Boot
+- no Windows version, only a design note
+- nothing is deployed to a hosting service
 - Google, Firebase, Supabase and Cloudinary code was tested against simulated responses only
-- The security audit was ours, not a third-party penetration test
-- Alarms only fire while the Axor server is running
+- the security audit was ours, not a third-party penetration test
+- alarms only fire while the Axor server is running
 
-Full feature tables and setup notes: [docs/DETAILS.md](docs/DETAILS.md) and [SETUP.md](SETUP.md).
+full feature tables and setup notes: [docs/DETAILS.md](docs/DETAILS.md) and [SETUP.md](SETUP.md).
 
-## Team
+---
 
-| Name | Reg. No. |
+## team
+
+| name | reg. no. |
 |---|---|
 | Jidiga Charan Reddy | 23BCB7120 |
 | Lingampally Sampath | 23BCB7136 |
 | A. Sai Jayanth | 23BCB7169 |
 | Nazeer Shaik | 23BCB7230 |
 
-Guide: Dr. Balaraju Ramesh, School of Computer Science and Engineering, VIT-AP University.
+guide: Dr. Balaraju Ramesh, School of Computer Science and Engineering, VIT-AP University.
+
+if you like it, star the repo :)
