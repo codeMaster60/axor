@@ -113,7 +113,7 @@ select{background:var(--s1);color:var(--tx);border:1px solid var(--line);border-
 .md table{border-collapse:collapse;margin:8px 0;display:block;overflow-x:auto}.md th,.md td{border:1px solid var(--line);padding:6px 10px}.md th{background:var(--s2);text-align:left}
 .md .katex-display{margin:12px 0;overflow-x:auto;overflow-y:hidden;padding:2px 0}.md .katex{font-size:1.08em}.md hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 .exp{padding:22px 26px!important;background:var(--bg);border-radius:14px;max-width:760px}
-.acts{display:flex;gap:6px;margin-top:8px;opacity:0;transition:.2s}.m:hover .acts{opacity:1}.acts button{font-size:12px;color:var(--mut);padding:3px 10px;border-radius:8px;border:1px solid var(--line)}.acts button:hover{color:var(--tx);background:var(--s2)}
+.acts{display:flex;gap:6px;margin-top:8px;opacity:.55;transition:.2s}.m:hover .acts{opacity:1}.acts button{font-size:12px;color:var(--mut);padding:3px 10px;border-radius:8px;border:1px solid var(--line)}.acts button:hover{color:var(--tx);background:var(--s2)}
 #pend{max-width:760px;margin:0 auto 8px;display:none}#pend.on{display:flex}
 .chip{display:inline-flex;align-items:center;gap:10px;background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:6px 10px 6px 6px;font-size:13px;max-width:100%}.chip img{width:38px;height:38px;border-radius:8px;object-fit:cover}
 .chip .fi{width:38px;height:38px;border-radius:8px;background:var(--s2);display:grid;place-items:center;font-size:10px;font-weight:700;color:var(--ac);letter-spacing:.4px}.chip b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}.chip small{color:var(--mut);display:block}
@@ -520,8 +520,13 @@ function docCard(th,r){const text0=r.response,body=th.querySelector(".body");let
   scroll(true)}
 function actions(body,text){const a=document.createElement("div");a.className="acts";const figs=[...body.querySelectorAll("figure:not(.bad)")];
   if(figs.length){a.innerHTML=`<button data-a="all">${figs.length>1?"Save all "+figs.length+" images":"Save image"}</button><button data-a="lnk">Copy links</button>`}
-  else a.innerHTML=`<button data-a="copy">Copy</button>`;
+  else a.innerHTML=`<button data-a="copy">Copy</button><button data-a="speak" title="Play this reply as sound">Play sound</button>`;
   a.onclick=async e=>{const k=e.target.dataset.a;if(!k)return;const dd=a.querySelector(".dd");
+    if(k==="speak"){const b=e.target;if(b.dataset.on==="1"){b.dataset.on="";b.textContent="Play sound";try{speechSynthesis.cancel()}catch(_){}ff("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stop:true})}).catch(()=>{});return}
+      b.dataset.on="1";b.textContent="Stop sound";let ok=false;try{const r=await ff("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});ok=(await r.json()).ok}catch(_){}
+      if(!ok&&window.speechSynthesis){const u=new SpeechSynthesisUtterance(text.replace(/[*#`_>|]/g,""));u.onend=()=>{b.dataset.on="";b.textContent="Play sound"};speechSynthesis.cancel();speechSynthesis.speak(u)}
+      else if(!ok){b.dataset.on="";b.textContent="Play sound";toast("Sound isn't available here")}
+      else setTimeout(()=>{b.dataset.on="";b.textContent="Play sound"},Math.min(60000,Math.max(3000,text.length*70)));return}
     if(k==="menu"){dd.classList.toggle("open");return}dd&&dd.classList.remove("open");
     if(k==="copy")navigator.clipboard?.writeText(text).then(()=>toast("Copied"));
     else if(k==="txt")saveBlob(new Blob([text],{type:"text/markdown"}),fname(".md"),"Markdown",".md");

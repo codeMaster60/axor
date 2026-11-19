@@ -84,6 +84,16 @@ def osa(script): return sh(["osascript", "-e", script])
 def speak(text, voice):
     if IS_MAC and text:
         subprocess.Popen(["say", "-v", voice, text[:600]])
+def lock_screen():
+    """Lock the Mac: Control+Command+Q first, then CGSession, then display sleep (locks if a password is required)."""
+    if not IS_MAC: return False
+    ok, _ = osa('tell application "System Events" to keystroke "q" using {control down, command down}')
+    if ok: return True
+    cg = "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession"
+    if os.path.exists(cg):
+        ok, _ = sh([cg, "-suspend"])
+        if ok: return True
+    ok, _ = sh(["pmset", "displaysleepnow"]); return ok
 def notify(title, msg):
     if IS_MAC: osa(f'display notification {json.dumps(msg)} with title {json.dumps(title)} sound name "Glass"')
 def online():
@@ -278,7 +288,8 @@ def run_command(raw):
     # battery
     if "battery" in t:
         ok, o = sh(["pmset", "-g", "batt"]); m = re.search(r"(\d+)%", o)
-        return "system", (f"Battery is at {m.group(1)} percent." if m else "I couldn't read the battery."), bool(m)
+        chg = " and charging" if re.search(r"AC Power|charging", o) and "discharging" not in o else ""
+        return "system", (f"Battery is at {m.group(1)} percent{chg}." if m else "I couldn't read the battery."), bool(m)
     # calculator
     m = re.match(r"(?:calculate|what is|what's|compute)?\s*([\d\.\s\+\-\*/x%\(\)\^]+|[\d\.\s]+(?:plus|minus|times|divided by|multiplied by|into)[\w\.\s]+)$", t)
     if m and re.search(r"\d", t) and re.search(r"[\+\-\*/x%\^]|plus|minus|times|divided|multiplied|into", t):
@@ -311,8 +322,8 @@ def run_command(raw):
                 except Exception: pass
             except Exception as e: extra = " (Cloud upload failed.)"
         return "system", (("Screenshot saved to your Desktop." + extra) if ok else "Screenshot failed. Allow Screen Recording for your terminal."), ok
-    if re.search(r"lock (the )?(screen|mac)", t):
-        ok, _ = sh(["pmset", "displaysleepnow"]); return "system", "Locking the screen.", ok
+    if re.search(r"\block\b.{0,25}\b(screen|mac|macbook|laptop|computer|pc|system|it)\b|^lock( now| up)?$", t):
+        ok = lock_screen(); return "system", ("Locking your Mac." if ok else "I couldn't lock the screen. Allow Accessibility for your terminal in System Settings."), ok
     # "it's still there" right after a delete: look again in Google Calendar and say honestly what happened
     if re.search(r"\b(still|not|nt|never|hasn'?t|didn'?t|isn'?t|wasn'?t)\b.{0,30}\b(there|deleted|removed|gone|showing|appear\w*|updated)\b", t) and not DELETE_RE.search(t):
         with db() as c: lastr = c.execute("SELECT response FROM history WHERE user_id=? AND conv=? ORDER BY id DESC LIMIT 1", (uid(), getattr(CUR, "conv", None))).fetchone()
@@ -764,6 +775,16 @@ def api_note_add():
 def api_note_del(i):
     with db() as c: c.execute("DELETE FROM notes WHERE id=? AND user_id=?", (i, uid()))
     return jsonify(ok=True)
+@app.post("/api/speak")
+def api_speak():
+    d = request.get_json(force=True) or {}
+    if d.get("stop"):
+        if IS_MAC: sh(["pkill", "say"])
+        return jsonify(ok=True)
+    txt = speakable(d.get("text") or "")
+    if not (IS_MAC and txt): return jsonify(ok=False, mac=IS_MAC)
+    if IS_MAC: sh(["pkill", "say"])
+    speak(txt, get_settings()["voice"]); return jsonify(ok=True)
 @app.route("/")
 def index(): return send_from_directory(BASE, "index.html")
 @app.post("/api/command")
